@@ -1,5 +1,3 @@
-
-```markdown
 # NSFW Image Detection Model
 
 This project demonstrates how to create a machine learning model to detect NSFW (Not Safe for Work) images using Python, TensorFlow/Keras, and Flask. This guide covers all steps from setting up the environment, training the model, and deploying it using Flask.
