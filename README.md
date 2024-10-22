@@ -200,4 +200,4 @@ You have successfully built and deployed an NSFW image detector. You can enhance
 
 ---
 **Note:** This project uses a pre-trained MobileNetV2 model for binary classification of NSFW and SFW images.
-```
+
