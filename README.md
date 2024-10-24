@@ -1,3 +1,4 @@
+
 # NSFW Image Detection
 
 This project aims to create a machine learning model that detects NSFW (Not Safe For Work) images using TensorFlow and Flask. It includes data preprocessing, model training, evaluation, and deployment of a web API.
@@ -10,6 +11,7 @@ This project aims to create a machine learning model that detects NSFW (Not Safe
 - [Model Creation](#model-creation)
 - [Training the Model](#training-the-model)
 - [Evaluating the Model](#evaluating-the-model)
+- [Using the Transformers Pipeline](#using-the-transformers-pipeline)
 - [Creating a Flask App for Deployment](#creating-a-flask-app-for-deployment)
 - [Deploying the App](#deploying-the-app)
 - [Final Project Structure](#final-project-structure)
@@ -31,35 +33,28 @@ You will need the following Python libraries:
 - Pandas
 - Matplotlib
 - Flask
+- Transformers
+- Torch
+- torchvision
 
 You can install these libraries using pip. Open a command prompt and run:
 
 ```bash
-pip install tensorflow numpy pandas matplotlib flask
+pip install tensorflow numpy pandas matplotlib flask transformers torch torchvision
 ```
 
 ## Setup
 
-1. **Create a virtual environment** (recommended):
+1. **Create a project directory:**
 
    Open a command prompt and run:
-
-   ```bash
-   python -m venv venv
-   .\venv\Scripts\activate  # On Windows
-   source venv/bin/activate  # On macOS/Linux
-   ```
-
-2. **Create a project directory:**
-
-   Run the following commands:
 
    ```bash
    mkdir nsfw_image_detector
    cd nsfw_image_detector
    ```
 
-3. **Create subfolders and files:**
+2. **Create subfolders and files:**
 
    In the command prompt, run:
 
@@ -133,34 +128,23 @@ validation_generator = validation_datagen.flow_from_directory(
 
 ## Model Creation
 
-Create a model script `model.py` to define the architecture using MobileNetV2.
+Create a model script `model.py` to define the architecture using MobileNetV2 (optional) or use the Transformers library for NSFW detection.
+
+### Using the Transformers Library
+
+You can load the model using the Hugging Face `transformers` library.
 
 ```python
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
-from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam
+from transformers import AutoImageProcessor, AutoModelForImageClassification
 
-def create_model():
-    base_model = MobileNetV2(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
-
-    x = base_model.output
-    x = GlobalAveragePooling2D()(x)
-    x = Dense(1024, activation='relu')(x)
-    predictions = Dense(1, activation='sigmoid')(x)
-
-    model = Model(inputs=base_model.input, outputs=predictions)
-
-    for layer in base_model.layers:
-        layer.trainable = False
-
-    model.compile(optimizer=Adam(learning_rate=0.0001), loss='binary_crossentropy', metrics=['accuracy'])
-    return model
+# Load model and processor
+processor = AutoImageProcessor.from_pretrained("Falconsai/nsfw_image_detection")
+model = AutoModelForImageClassification.from_pretrained("Falconsai/nsfw_image_detection")
 ```
 
 ## Training the Model
 
-Create a training script `train.py` to train the model.
+If you decide to train your model using TensorFlow, create a training script `train.py` to train the model.
 
 ```python
 from preprocessing import train_generator, validation_generator
@@ -205,22 +189,41 @@ Run the evaluation script:
 python evaluate.py
 ```
 
+## Using the Transformers Pipeline
+
+To utilize the Hugging Face pipeline for NSFW image classification:
+
+```python
+from transformers import pipeline
+from PIL import Image
+
+# Load the image classification pipeline
+pipe = pipeline("image-classification", model="Falconsai/nsfw_image_detection")
+
+# Load the image you want to classify
+image_path = "path_to_your_image.jpg"  # Update with your image path
+image = Image.open(image_path)
+
+# Perform the classification
+results = pipe(image)
+
+# Print the results
+print(results)
+```
+
 ## Creating a Flask App for Deployment
 
 Create a Flask app `app.py` to serve your model as an API.
 
 ```python
 from flask import Flask, request, jsonify
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
+from transformers import AutoImageProcessor, AutoModelForImageClassification
+from PIL import Image
 import numpy as np
-import os
 
-# Ensure uploads directory exists
-if not os.path.exists('./uploads'):
-    os.makedirs('./uploads')
+processor = AutoImageProcessor.from_pretrained("Falconsai/nsfw_image_detection")
+model = AutoModelForImageClassification.from_pretrained("Falconsai/nsfw_image_detection")
 
-model = load_model('nsfw_detector_model.h5')
 app = Flask(__name__)
 
 @app.route('/predict', methods=['POST'])
@@ -229,16 +232,15 @@ def predict():
     img_path = f'./uploads/{img.filename}'
     img.save(img_path)
 
-    img = image.load_img(img_path, target_size=(224, 224))
-    img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array /= 255.
-
-    prediction = model.predict(img_array)[0][0]
+    img = Image.open(img_path).convert("RGB")
+    inputs = processor(images=img, return_tensors="pt")
+    
+    outputs = model(**inputs)
+    logits = outputs.logits
+    predictions = logits.argmax(dim=1)
 
     return jsonify({
-        'prediction': 'NSFW' if prediction > 0.5 else 'SFW',
-        'confidence': float(prediction)
+        'prediction': 'NSFW' if predictions.item() == 1 else 'SFW'
     })
 
 if __name__ == '__main__':
@@ -251,14 +253,6 @@ Run the Flask app:
 python app.py
 ```
 
-### Testing the API
-
-You can test the API using tools like Postman or curl. For example, using curl:
-
-```bash
-curl -X POST -F "image=@path_to_your_image.jpg" http://127.0.0.1:5000/predict
-```
-
 ## Deploying the App
 
 ### Deployment Options
@@ -267,14 +261,6 @@ You can deploy your Flask app using platforms like:
 
 - **Heroku**: Follow the [Heroku deployment guide](https://devcenter.heroku.com/articles/getting-started-with-python).
 - **AWS EC2**: Follow the [AWS EC2 Flask deployment guide](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create-deploy-python-flask.html).
-
-### Security Considerations
-
-If deploying publicly, consider implementing security measures such as:
-
-- Input validation
-- Rate limiting
-- HTTPS setup
 
 ## Final Project Structure
 
@@ -295,4 +281,5 @@ nsfw_image_detector/
 
 - TensorFlow for providing the necessary libraries and tools.
 - The creators of MobileNetV2 for the pre-trained model architecture.
+- Hugging Face for the `transformers` library and the `Falconsai/nsfw_image_detection` model.
 ```
