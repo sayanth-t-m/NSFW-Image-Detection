@@ -1,6 +1,3 @@
-Here’s an updated `README.md` for your NSFW image detection project, incorporating the suggestions and enhancements mentioned earlier:
-
-```markdown
 # NSFW Image Detection
 
 This project aims to create a machine learning model that detects NSFW (Not Safe For Work) images using TensorFlow and Flask. It includes data preprocessing, model training, evaluation, and deployment of a web API.
